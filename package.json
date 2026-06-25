@@ -1,0 +1,31 @@
+{
+  "name": "track-vision-overlay",
+  "version": "1.0.0",
+  "description": "Track Vision Sim Racing — iRacing telemetry overlay",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run build:watch\" \"npm run electron:dev\"",
+    "build": "node scripts/build.js",
+    "build:check": "tsc --project tsconfig.json --noEmit",
+    "electron:dev": "wait-on dist/main/main.js && cross-env ELECTRON_RUN_AS_NODE= electron .",
+    "start": "cross-env ELECTRON_RUN_AS_NODE= node_modules/electron/dist/electron.exe .",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir"
+  },
+  "dependencies": {
+    "irsdk-node": "^4.4.0",
+    "koffi": "^3.0.2",
+    "node-irsdk": "^2.1.6"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@types/node": "^20.0.0",
+    "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
+    "electron": "^29.4.6",
+    "electron-builder": "^24.9.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.4.0",
+    "wait-on": "^7.2.0"
+  }
+}

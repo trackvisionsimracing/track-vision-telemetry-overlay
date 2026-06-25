@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Track Vision Sim Racing</title>
+  
+  <path d="M 32 4 C 19 4 9 13 9 28 L 9 42 C 9 50 13 56 18 58 C 22 60 27 61 32 61 C 37 61 42 60 46 58 C 51 56 55 50 55 42 L 55 28 C 55 13 45 4 32 4 Z" fill="#e8edf5"></path>
+  
+  <path d="M 32 4 C 45 4 55 13 55 28 L 55 42 C 55 50 51 56 46 58 C 42 60 37 61 32 61 L 32 4 Z" fill="#c8d2e2" opacity="0.5"></path>
+  
+  <path d="M 13 22 C 13 20 14 19 16 19 L 48 19 C 50 19 51 20 51 22 L 51 38 C 51 41 49 43 46 43 L 18 43 C 15 43 13 41 13 38 Z" fill="#0a1220"></path>
+  
+  <path d="M 16 22 L 48 22 L 48 25 C 48 25 40 24 32 24 C 24 24 16 25 16 25 Z" fill="#3b5478" opacity="0.6"></path>
+  
+  <path d="M 26 49 C 26 48 27 47 28 47 L 36 47 C 37 47 38 48 38 49 L 38 51 C 38 52 37 53 36 53 L 28 53 C 27 53 26 52 26 51 Z" fill="#0a1220"></path>
+  
+  <circle cx="13" cy="32" r="1.8" fill="#0a1220"></circle>
+  <circle cx="51" cy="32" r="1.8" fill="#0a1220"></circle>
+</svg>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Vision Overlay</title>
+  <link rel="stylesheet" href="overlay.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root">
+
+    <!-- Header: branding left, ghost controls center, actions + status right -->
+    <div id="header">
+      <div id="branding">
+        <img id="logo" src="helmet.svg" alt="Track Vision" />
+      </div>
+      <div id="controls">
+        <label class="ctrl-label"><input type="checkbox" id="chk-throttle" style="accent-color:#39FF14;" /> THR</label>
+        <label class="ctrl-label"><input type="checkbox" id="chk-brake" style="accent-color:#FF3131;" /> BRK</label>
+        <label class="ctrl-label"><input type="checkbox" id="chk-best" /> BEST</label>
+      </div>
+      <div id="header-btns">
+        <button id="btn-move-pos">Move Overlay</button>
+        <button id="btn-reset-pos">Reset</button>
+      </div>
+      <div id="header-right">
+        <span id="header-url">trackvisionsimracing.com</span>
+        <div id="status-dot" class="disconnected"></div>
+      </div>
+    </div>
+
+    <!-- Body: trace | pedal bars | gear+speed | steering wheel -->
+    <div id="body-row">
+
+      <!-- Telemetry rolling trace (dark grey) -->
+      <div id="canvas-wrap">
+        <canvas id="trace-canvas"></canvas>
+      </div>
+
+      <div class="col-divider"></div>
+
+      <!-- Three vertical pedal bars: Clutch | Brake | Throttle -->
+      <div id="pedal-bars">
+        <div class="pedal-col">
+          <div class="pedal-track">
+            <div class="pedal-fill pedal-clutch" id="bar-clutch"></div>
+          </div>
+        </div>
+        <div class="pedal-col">
+          <div class="pedal-track">
+            <div class="pedal-fill pedal-brake" id="bar-brake"></div>
+          </div>
+        </div>
+        <div class="pedal-col">
+          <div class="pedal-track">
+            <div class="pedal-fill pedal-throttle" id="bar-throttle"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-divider"></div>
+
+      <!-- Gear number + speed in mph -->
+      <div id="info-panel">
+        <div id="v-gear-big">–</div>
+        <div id="v-speed-big">0</div>
+        <div class="speed-unit">mph</div>
+      </div>
+
+      <div class="col-divider"></div>
+
+      <!-- Steering wheel — rotates with SteeringWheelAngle -->
+      <div id="wheel-panel">
+        <div id="wheel-container">
+          <!-- Real wheel image when detected; canvas fallback otherwise -->
+          <img id="wheel-img" class="hidden" alt="steering wheel" />
+          <canvas id="wheel-canvas"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+  <script src="overlay.js"></script>
+</body>
+</html>

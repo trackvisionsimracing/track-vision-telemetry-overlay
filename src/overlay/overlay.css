@@ -1,0 +1,406 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --tv-accent:     #39FF14;
+  --tv-red:        #FF3131;
+  --tv-blue:       #00CFFF;
+  --tv-bg-canvas:  rgba(18, 18, 24, 0.93);
+  --tv-bg-nav:     rgba(7, 11, 28, 0.95);
+  --tv-border:     rgba(255,255,255,0.08);
+  --tv-text:       #ffffff;
+  --tv-muted:      rgba(255,255,255,0.36);
+  --radius:        14px;
+  --font:          'Inter', system-ui, sans-serif;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font);
+  color: var(--tv-text);
+}
+
+/* ─── Root container ─────────────────────────────────────────────────────── */
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tv-bg-nav);
+  border: 2px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 42px;
+  border-bottom: 1px solid var(--tv-border);
+  flex-shrink: 0;
+  background: var(--tv-bg-nav);
+  -webkit-app-region: no-drag;
+}
+
+#header.unlocked {
+  -webkit-app-region: drag;
+  cursor: move;
+}
+
+#branding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#branding.hidden { visibility: hidden; }
+
+#logo {
+  height: 30px;
+  width: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+#branding-wordmark {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tv-accent);
+  opacity: 0.85;
+}
+
+/* Overlay controls — always visible */
+#controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+  opacity: 1;
+  pointer-events: all;
+  -webkit-app-region: no-drag;
+}
+
+.ctrl-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--tv-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ctrl-label input[type="checkbox"] {
+  accent-color: var(--tv-accent);
+  width: 11px;
+  height: 11px;
+  cursor: pointer;
+}
+
+/* ─── Header right group ─────────────────────────────────────────────────── */
+#header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1;
+}
+
+#header-url {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+}
+
+/* ─── Header action buttons ──────────────────────────────────────────────── */
+#header-btns {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#header-btns button {
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  -webkit-app-region: no-drag;
+  pointer-events: all;
+}
+
+#header-btns button:hover {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+}
+
+#btn-move-pos.active {
+  background: rgba(var(--tv-accent-rgb, 57,255,20), 0.18);
+  border-color: var(--tv-accent);
+  color: var(--tv-accent);
+}
+
+/* ─── Status dot ─────────────────────────────────────────────────────────── */
+#status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #444;
+  flex-shrink: 0;
+  transition: background 0.4s;
+}
+
+#status-dot.connected    { background: var(--tv-accent); }
+#status-dot.disconnected { background: #444; }
+
+/* ─── Body row ───────────────────────────────────────────────────────────── */
+#body-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Telemetry canvas — dark grey section ───────────────────────────────── */
+#canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: var(--tv-bg-canvas);
+}
+
+#trace-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Column dividers ────────────────────────────────────────────────────── */
+.col-divider {
+  width: 1px;
+  background: var(--tv-border);
+  flex-shrink: 0;
+}
+
+/* ─── Pedal bars ─────────────────────────────────────────────────────────── */
+#pedal-bars {
+  width: 100px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+  padding: 8px 10px;
+  background: var(--tv-bg-nav);
+}
+
+.pedal-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.pedal-track {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pedal-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  border-radius: 2px;
+  transition: height 0.04s linear;
+}
+
+.pedal-clutch   { background: var(--tv-blue); }
+.pedal-brake    { background: var(--tv-red); }
+.pedal-throttle { background: var(--tv-accent); }
+
+.pedal-label {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tv-muted);
+}
+
+/* ─── Gear + Speed info panel ────────────────────────────────────────────── */
+#info-panel {
+  width: 84px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  gap: 1px;
+  background: var(--tv-bg-nav);
+}
+
+#v-gear-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: -0.03em;
+}
+
+#v-speed-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.speed-unit {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tv-muted);
+  margin-top: 1px;
+}
+
+/* ─── Steering wheel panel ───────────────────────────────────────────────── */
+#wheel-panel {
+  width: 112px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: var(--tv-bg-nav);
+  position: relative;
+}
+
+#wheel-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+}
+
+#wheel-canvas { display: block; }
+
+/* Real wheel image — slight rounding, contains within panel */
+#wheel-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  display: block;
+  transition: transform 0.03s linear;
+}
+
+#wheel-img.hidden { display: none; }
+
+/* Save Position button — appears only in drag mode */
+#btn-save-pos {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  background: var(--tv-accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  pointer-events: all;
+}
+
+#btn-save-pos.hidden { display: none; }
+
+/* ─── Drag mode — outline + whole overlay becomes draggable ──────────────── */
+#root.drag-mode {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: -2px;
+  cursor: move;
+}
+
+/*
+ * -webkit-app-region does NOT inherit to children.
+ * Every element that covers the window must be set to 'drag' explicitly,
+ * otherwise children "block" the parent's drag region.
+ */
+#root.drag-mode,
+#root.drag-mode #header,
+#root.drag-mode #body-row,
+#root.drag-mode #canvas-wrap,
+#root.drag-mode #trace-canvas,
+#root.drag-mode #pedal-bars,
+#root.drag-mode .pedal-col,
+#root.drag-mode .pedal-track,
+#root.drag-mode .pedal-fill,
+#root.drag-mode .pedal-label,
+#root.drag-mode .col-divider,
+#root.drag-mode #info-panel,
+#root.drag-mode #v-gear-big,
+#root.drag-mode #v-speed-big,
+#root.drag-mode .speed-unit,
+#root.drag-mode #wheel-panel,
+#root.drag-mode #wheel-container,
+#root.drag-mode #wheel-canvas,
+#root.drag-mode #wheel-img,
+#root.drag-mode #branding,
+#root.drag-mode #header-right,
+#root.drag-mode #header-url,
+#root.drag-mode #status-dot,
+#root.drag-mode #controls,
+#root.drag-mode #logo {
+  -webkit-app-region: drag;
+  cursor: move;
+  pointer-events: none;
+}
+
+/* Header buttons stay clickable in drag mode */
+#root.drag-mode #header-btns,
+#root.drag-mode #header-btns button {
+  -webkit-app-region: no-drag;
+  pointer-events: all;
+  cursor: pointer;
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Vision Overlay — Control Panel</title>
+  <link rel="stylesheet" href="control.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div id="panel-header">
+    <h1>Track Vision Overlay</h1>
+    <span id="conn-badge">WAITING</span>
+  </div>
+
+  <!-- Overlay toggle + Close App -->
+  <div id="overlay-power-section">
+    <button id="btn-overlay-power">
+      <span id="overlay-power-dot"></span>
+      <span id="overlay-power-label">TOGGLE OVERLAY</span>
+    </button>
+    <button class="btn quit-btn" id="btn-quit">Close App</button>
+  </div>
+
+  <!-- Lock + Opacity -->
+  <div class="section">
+    <div class="section-title">Overlay</div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Lock position</span>
+      <label class="toggle">
+        <input type="checkbox" id="tog-locked" />
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="slider-row">
+      <label for="sl-opacity">Opacity</label>
+      <input type="range" id="sl-opacity" min="0.3" max="1" step="0.01" value="0.85" />
+    </div>
+
+    <div class="btn-row" style="margin-top: 10px;">
+      <button class="btn" id="btn-move-overlay">Move Overlay</button>
+    </div>
+  </div>
+
+  <!-- Channels -->
+  <div class="section">
+    <div class="section-title">Channels</div>
+    <div class="checkbox-grid">
+      <label class="checkbox-item"><input type="checkbox" id="ch-throttle" /> Throttle</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-brake" />    Brake</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-clutch" />   Clutch</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-steering" /> Steering</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-gear" />     Gear</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-speed" />    Speed</label>
+      <label class="checkbox-item"><input type="checkbox" id="ch-rpm" />      RPM</label>
+    </div>
+  </div>
+
+  <!-- Ghost lines -->
+  <div class="section">
+    <div class="section-title">Ghost Lines</div>
+    <div class="ghost-cols">
+      <label class="checkbox-item"><input type="checkbox" id="gh-session" />  Session best</label>
+      <label class="checkbox-item"><input type="checkbox" id="gh-throttle" /> Show throttle</label>
+      <label class="checkbox-item"><input type="checkbox" id="gh-brake" />    Show brake</label>
+    </div>
+    <div class="btn-row" style="margin-top: 12px;">
+      <button class="btn danger" id="btn-reset-cur">Reset current car/track</button>
+      <button class="btn danger" id="btn-reset-all">Reset all</button>
+    </div>
+  </div>
+
+  <!-- Theme -->
+  <div class="section">
+    <div class="section-title">Theme</div>
+    <div class="color-row">
+      <label for="col-accent">Accent color</label>
+      <input type="color" id="col-accent" value="#00FF87" />
+    </div>
+  </div>
+
+  <!-- System -->
+  <div class="section">
+    <div class="section-title">System</div>
+    <div class="toggle-row">
+      <span class="toggle-label">Launch on startup</span>
+      <label class="toggle">
+        <input type="checkbox" id="tog-startup" />
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="detected-wheel-row">
+      <span class="toggle-label">Detected wheel</span>
+      <span id="detected-wheel">—</span>
+    </div>
+  </div>
+
+  <div id="panel-footer">
+    <small>Track Vision Sim Racing © 2026</small>
+  </div>
+
+  <script src="control.js"></script>
+</body>
+</html>

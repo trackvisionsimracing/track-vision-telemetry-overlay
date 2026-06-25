@@ -1,0 +1,30 @@
+appId: com.trackvision.overlay
+productName: Track Vision Overlay
+copyright: Copyright © 2026 Track Vision Sim Racing
+
+directories:
+  output: release
+
+files:
+  - dist/**/*
+  - assets/**/*
+  - node_modules/**/*
+  - package.json
+
+asarUnpack:
+  - node_modules/irsdk-node/**/*
+  - node_modules/@irsdk-node/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: assets/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  installerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
