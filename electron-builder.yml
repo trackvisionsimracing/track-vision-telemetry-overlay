@@ -5,6 +5,8 @@ copyright: Copyright © 2026 Track Vision Sim Racing
 directories:
   output: release
 
+npmRebuild: false
+
 files:
   - dist/**/*
   - assets/**/*
@@ -14,17 +16,18 @@ files:
 asarUnpack:
   - node_modules/irsdk-node/**/*
   - node_modules/@irsdk-node/**/*
+  - node_modules/koffi/**/*
 
 win:
   target:
     - target: nsis
       arch: x64
-  icon: assets/icon.ico
+  icon: assets/tv-icon3.ico
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  installerIcon: assets/icon.ico
-  installerHeaderIcon: assets/icon.ico
+  installerIcon: assets/tv-icon3.ico
+  installerHeaderIcon: assets/tv-icon3.ico

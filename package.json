@@ -1,7 +1,7 @@
 {
   "name": "track-vision-overlay",
-  "version": "1.0.0",
-  "description": "Track Vision Sim Racing — iRacing telemetry overlay",
+  "version": "1.1.0",
+  "description": "Track Vision Sim Racing — iRacing, Assetto Corsa / EVO, and F1 telemetry overlay",
   "main": "dist/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run build:watch\" \"npm run electron:dev\"",

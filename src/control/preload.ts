@@ -13,9 +13,10 @@ contextBridge.exposeInMainWorld('tvAPI', {
   setChannels:   (c: any)       => ipcRenderer.send(IPC.SET_CHANNELS, c),
   setStartup:    (v: boolean)   => ipcRenderer.send(IPC.SET_STARTUP, v),
   setAccent:     (c: string)    => ipcRenderer.send(IPC.SET_ACCENT, c),
+  setWheelImage: (v: string)    => ipcRenderer.send(IPC.SET_WHEEL_IMAGE, v),
   toggleBranding:()             => ipcRenderer.send(IPC.TOGGLE_BRANDING),
   resetBest:     (p: any)       => ipcRenderer.send(IPC.RESET_BEST, p),
   quit:          ()             => ipcRenderer.send(IPC.QUIT),
   startMove:        ()                         => ipcRenderer.send(IPC.START_MOVE),
-  onWheelDetected:  (cb: (id: string) => void) => ipcRenderer.on(IPC.WHEEL_DETECTED, (_, id) => cb(id)),
+  onWheelDetected:  (cb: (payload: { id: string; brand: string }) => void) => ipcRenderer.on(IPC.WHEEL_DETECTED, (_, p) => cb(p)),
 });

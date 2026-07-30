@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld('tvAPI', {
   startMove:     ()                    => ipcRenderer.send(IPC.START_MOVE),
   savePosition:  ()                    => ipcRenderer.send(IPC.SAVE_POSITION),
   resetPosition: ()                    => ipcRenderer.send(IPC.RESET_POSITION),
-  reportWheel:   (id: string)          => ipcRenderer.send(IPC.WHEEL_DETECTED, id),
+  reportWheel:   (id: string, brand: string) => ipcRenderer.send(IPC.WHEEL_DETECTED, { id, brand }),
 });

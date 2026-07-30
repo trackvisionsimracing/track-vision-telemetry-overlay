@@ -12,6 +12,7 @@ const defaults: Settings = {
   invertClutch: true,
   accentColor: '#00FF87',   // ← Track Vision brand green — update here
   showBranding: true,
+  wheelImage: 'drawn',
   channels: {
     throttle: true,
     brake: true,

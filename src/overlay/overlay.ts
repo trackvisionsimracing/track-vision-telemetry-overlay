@@ -13,7 +13,7 @@ declare const tvAPI: {
   startMove:     () => void;
   savePosition:  () => void;
   resetPosition: () => void;
-  reportWheel:   (id: string) => void;
+  reportWheel:   (id: string, brand: string) => void;
 };
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ const COLOR = {
 };
 
 // ─── Ring buffer of live samples ──────────────────────────────────────────────
-const HISTORY = 240;
+const HISTORY = 210;
 
 interface Sample { pct: number; thr: number; brk: number; clu: number; }
 
@@ -56,7 +56,6 @@ const wheelContainer = document.getElementById('wheel-container')!;
 const wheelCanvas = document.getElementById('wheel-canvas') as HTMLCanvasElement;
 const wCtx        = wheelCanvas.getContext('2d')!;
 const wheelImg    = document.getElementById('wheel-img')!   as HTMLImageElement;
-const btnMovePos  = document.getElementById('btn-move-pos')!  as HTMLButtonElement;
 const btnResetPos = document.getElementById('btn-reset-pos')! as HTMLButtonElement;
 
 // ─── Canvas sizing ────────────────────────────────────────────────────────────
@@ -75,7 +74,12 @@ function resizeWheel(): void {
   wheelCanvas.style.height = Math.max(size, 20) + 'px';
 }
 
-const ro = new ResizeObserver(() => { resizeTrace(); resizeWheel(); });
+const ro = new ResizeObserver(() => {
+  resizeTrace();
+  resizeWheel();
+  lastDrawnAngle = Infinity; // canvas contents were wiped by the resize
+  needsRedraw    = true;
+});
 ro.observe(traceCanvas);
 ro.observe(wheelContainer);
 resizeTrace();
@@ -83,55 +87,134 @@ resizeWheel();
 
 // ─── Wheel image detection ────────────────────────────────────────────────────
 
-const WHEEL_MAP: Array<{ keywords: string[]; image: string }> = [
-  { keywords: ['fanatec', '0eb7'],                          image: 'wheels/fanatec.webp'       },
-  { keywords: ['fx pro', 'fxpro', 'fx-pro'],                image: 'wheels/simagic-fx-pro.png' },
-  { keywords: ['simagic', 'simmagic', 'sim magic', '0483'], image: 'wheels/simagic-fx-pro.png' },
+// Brand detection map. Keywords match against the lowercased gamepad id, which
+// on Chromium includes the device name and "(Vendor: xxxx Product: xxxx)" — so
+// both product-name fragments and USB vendor ids work as keywords.
+// ORDER MATTERS: specific rims/models first, then brands. VRS uses the same STM
+// vendor id (0483) as Simagic, so it must be checked before the generic Simagic
+// entry. Missing image files fall back to the drawn wheel automatically.
+const WHEEL_MAP: Array<{ keywords: string[]; image: string; brand: string }> = [
+  // Specific rims
+  { keywords: ['fx pro', 'fxpro', 'fx-pro'],                                     image: 'wheels/simagic-fx-pro.png', brand: 'simagic' },
+  { keywords: ['gts'],                                                           image: 'wheels/simagic-gts.png',    brand: 'simagic' },
+  { keywords: ['neo x', 'x-310', 'x310'],                                        image: 'wheels/simagic.png',        brand: 'simagic' },
+  // Brands that share generic USB chips — check before the chip-id entries
+  { keywords: ['vrs', 'directforce'],                                            image: 'wheels/vrs.png',            brand: 'vrs' },
+  // Wheelbase brands
+  { keywords: ['simucube', '16d0'],                                              image: 'wheels/simucube.png',       brand: 'simucube' },
+  { keywords: ['simagic', 'simmagic', 'sim magic', '0483'],                      image: 'wheels/simagic-fx-pro.png', brand: 'simagic' },
+  { keywords: ['moza', '346e'],                                                  image: 'wheels/moza.png',           brand: 'moza' },
+  { keywords: ['fanatec', '0eb7', 'podium', 'clubsport', 'csl dd', 'gt dd'],     image: 'wheels/fanatec.png',        brand: 'fanatec' },
+  { keywords: ['asetek', 'invicta', 'la prima', 'laprima', 'forte', 'initium', '2433'], image: 'wheels/asetek.png',  brand: 'asetek' },
+  { keywords: ['logitech', '046d', 'g923', 'g920', 'g29', 'g27', 'rs50', 'pro racing wheel'], image: 'wheels/logitech.png', brand: 'logitech' },
+  { keywords: ['thrustmaster', '044f', 't818', 't598', 't300', 't500', 't-gt', 'tgt', 'tx racing', 'tmx'], image: 'wheels/thrustmaster.png', brand: 'thrustmaster' },
+  { keywords: ['velocityone', 'turtle beach', '10f5'],                           image: 'wheels/turtle-beach.png',   brand: 'turtle-beach' },
+  { keywords: ['cammus'],                                                        image: 'wheels/cammus.png',         brand: 'cammus' },
+  { keywords: ['pxn'],                                                           image: 'wheels/pxn.png',            brand: 'pxn' },
+  { keywords: ['qubic', 'qs-220', 'qs-ch2'],                                     image: 'wheels/qubic.png',          brand: 'qubic' },
+  { keywords: ['simsteering', 'sim steering'],                                   image: 'wheels/simsteering.png',    brand: 'simsteering' },
+  { keywords: ['accuforce', 'simxperience'],                                     image: 'wheels/accuforce.png',      brand: 'accuforce' },
+  { keywords: ['bodnar', '1dd2'],                                                image: 'wheels/leo-bodnar.png',     brand: 'leo-bodnar' },
+  { keywords: ['ecci'],                                                          image: 'wheels/ecci.png',           brand: 'ecci' },
 ];
 
 // Known pedal/accessory device names — skip these even if they match wheel keywords
-const PEDAL_EXCLUSIONS = ['p1000', 'p-1000', 'pedal', 'loadcell'];
+const PEDAL_EXCLUSIONS = [
+  'p1000', 'p-1000', 'p2000', 'pedal', 'loadcell', 'load cell',
+  'heusinkveld', 'handbrake', 'shifter', 'sequential', 'ds-8x', 'tb-1',
+  'button box', 'buttonbox',
+];
 
 function isPedalDevice(id: string): boolean {
   const lower = id.toLowerCase();
   return PEDAL_EXCLUSIONS.some(k => lower.includes(k));
 }
 
-let usingWheelImage = false;
+let currentWheelImage = ''; // image path currently shown ('' = drawn canvas wheel)
+let lastReportedWheel = '';
+let wheelImageChoice  = 'drawn'; // from settings: 'drawn' | key in WHEEL_CHOICES
 
-function tryLoadWheelImage(gpId: string): void {
-  if (usingWheelImage) return;
-  if (isPedalDevice(gpId)) return;
-  const id = gpId.toLowerCase();
-  const match = WHEEL_MAP.find(entry => entry.keywords.some(k => id.includes(k)));
-  if (!match) return;
+const WHEEL_CHOICES: Record<string, string> = {
+  'simagic-gt':     'wheels/simagic.png',
+  'simagic-fx-pro': 'wheels/simagic-fx-pro.png',
+  'simagic-gts':    'wheels/simagic-gts.png',
+  'fanatec':        'wheels/fanatec.png',
+  'simucube':       'wheels/simucube.png',
+};
 
+// Image files that failed to load (brand not shipped yet) — don't retry them
+const failedWheelImages = new Set<string>();
+
+function applyWheelImage(imagePath: string, gpId: string): void {
+  if (imagePath === currentWheelImage) return;
+  if (failedWheelImages.has(imagePath)) { clearWheelImage(); return; }
+  currentWheelImage = imagePath;
   const img = new Image();
   img.onload = () => {
-    wheelImg.src   = img.src;
+    if (currentWheelImage !== imagePath) return; // superseded by a newer scan
+    wheelImg.src = img.src;
     wheelImg.classList.remove('hidden');
     wheelCanvas.style.display = 'none';
-    usingWheelImage = true;
     console.log('[wheel] loaded image for:', gpId);
   };
-  img.src = match.image;
+  img.onerror = () => {
+    console.warn('[wheel] no image available:', imagePath, '— using drawn wheel');
+    failedWheelImages.add(imagePath);
+    if (currentWheelImage === imagePath) clearWheelImage();
+  };
+  img.src = imagePath;
+}
+
+function clearWheelImage(): void {
+  if (!currentWheelImage) return;
+  currentWheelImage = '';
+  wheelImg.classList.add('hidden');
+  wheelImg.style.transform = '';
+  wheelCanvas.style.display = '';
+  lastDrawnAngle = Infinity; // force the canvas wheel to repaint
+  needsRedraw    = true;
+  console.log('[wheel] wheel removed — using drawn wheel');
 }
 
 function scanGamepads(): void {
+  let matchedBrand = '';
+  let matchedGp: Gamepad | null = null;
+  let firstWheel: Gamepad | null = null;
+
   for (const gp of navigator.getGamepads()) {
-    if (!gp || !gp.id) continue;
-    if (!isPedalDevice(gp.id)) tvAPI.reportWheel(gp.id);
-    tryLoadWheelImage(gp.id);
+    if (!gp || !gp.id || isPedalDevice(gp.id)) continue;
+    if (!firstWheel) firstWheel = gp;
+    if (!matchedGp) {
+      const id = gp.id.toLowerCase();
+      const match = WHEEL_MAP.find(entry => entry.keywords.some(k => id.includes(k)));
+      if (match) { matchedBrand = match.brand; matchedGp = gp; }
+    }
   }
+
+  // Tell the control panel which wheel is connected (changes on swap), so it can
+  // filter the wheel-image dropdown to the detected wheelbase's own brand.
+  // Button/axis counts are included — they're the only rim-dependent signal
+  // some bases expose, and they make support questions much easier to answer.
+  const reportGp = matchedGp ?? firstWheel;
+  if (reportGp) {
+    const report = `${reportGp.id} — ${reportGp.buttons.length} buttons, ${reportGp.axes.length} axes`;
+    if (report !== lastReportedWheel) {
+      lastReportedWheel = report;
+      tvAPI.reportWheel(report, matchedBrand);
+    }
+  }
+
+  // The wheel image is the user's manual choice from the control panel
+  const chosen = WHEEL_CHOICES[wheelImageChoice];
+  if (chosen) applyWheelImage(chosen, `manual: ${wheelImageChoice}`);
+  else clearWheelImage(); // 'drawn'
 }
 
-window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
-  console.log('[wheel] gamepad connected:', e.gamepad.id);
-  if (!isPedalDevice(e.gamepad.id)) tvAPI.reportWheel(e.gamepad.id);
-  tryLoadWheelImage(e.gamepad.id);
-});
+window.addEventListener('gamepadconnected',    () => scanGamepads());
+window.addEventListener('gamepaddisconnected', () => scanGamepads());
 
-// Also scan once on load in case a gamepad is already connected
+// Rescan continuously so swapping wheels updates the image
+setInterval(scanGamepads, 2000);
 setTimeout(scanGamepads, 1000);
 
 // ─── Settings → DOM ───────────────────────────────────────────────────────────
@@ -145,6 +228,15 @@ function applySettings(s: Settings): void {
   document.documentElement.style.setProperty('--tv-accent', s.accentColor);
   COLOR.throttle      = s.accentColor;
   COLOR.throttleGhost = s.accentColor;
+
+  // Migrate the retired 'auto' value from older settings to 'drawn'
+  const choice = (!s.wheelImage || s.wheelImage === 'auto') ? 'drawn' : s.wheelImage;
+  if (choice !== wheelImageChoice) {
+    wheelImageChoice = choice;
+    scanGamepads(); // re-evaluate immediately with the new choice
+  }
+
+  needsRedraw = true; // channel/ghost toggles change what the canvas shows
 }
 
 // ─── Header hover — enables mouse events so buttons/checkboxes are clickable ──
@@ -171,14 +263,6 @@ function syncOverlayControls(): void {
 // ─── Drag mode (move overlay) ─────────────────────────────────────────────────
 let dragModeActive = false;
 
-btnMovePos.addEventListener('click', () => {
-  if (!dragModeActive) {
-    tvAPI.startMove();
-  } else {
-    tvAPI.savePosition();
-  }
-});
-
 btnResetPos.addEventListener('click', () => {
   tvAPI.resetPosition();
 });
@@ -186,8 +270,6 @@ btnResetPos.addEventListener('click', () => {
 tvAPI.onDragMode((enabled: boolean) => {
   dragModeActive = enabled;
   root.classList.toggle('drag-mode', enabled);
-  btnMovePos.textContent = enabled ? 'Save Position' : 'Move Overlay';
-  btnMovePos.classList.toggle('active', enabled);
 });
 
 // ─── Steering wheel drawing ───────────────────────────────────────────────────
@@ -290,60 +372,105 @@ function drawGhostChannel(trace: LapTrace, color: string, channel: 'throttle' | 
 }
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
+// Telemetry arrives at 60 Hz but monitors often run at 120–240 Hz. Redrawing
+// every vsync wastes GPU the game needs, so frames are skipped unless new data
+// (or a settings/resize change) marked the canvas dirty.
+let needsRedraw    = true;
+let lastDrawnAngle = Infinity;
+
+function markDirty(): void { needsRedraw = true; }
+
 function render(): void {
-  const W = traceCanvas.width;
-  const H = traceCanvas.height;
-  tCtx.clearRect(0, 0, W, H);
+  if (needsRedraw) {
+    needsRedraw = false;
 
-  if (settings) {
-    const s = settings;
-    if (s.channels.throttle) drawLiveTrace(COLOR.throttle, 'thr');
-    if (s.channels.brake)    drawLiveTrace(COLOR.brake,    'brk');
-    if (s.channels.clutch)   drawLiveTrace(COLOR.clutch,   'clu');
+    const W = traceCanvas.width;
+    const H = traceCanvas.height;
+    tCtx.clearRect(0, 0, W, H);
 
-    const drawGhostFor = (trace: LapTrace | null) => {
-      if (!trace) return;
-      if (s.ghosts.throttle && s.channels.throttle) drawGhostChannel(trace, COLOR.throttleGhost, 'throttle');
-      if (s.ghosts.brake    && s.channels.brake)    drawGhostChannel(trace, COLOR.brakeGhost,    'brake');
-    };
+    if (settings) {
+      const s = settings;
+      if (s.channels.throttle) drawLiveTrace(COLOR.throttle, 'thr');
+      if (s.channels.brake)    drawLiveTrace(COLOR.brake,    'brk');
+      if (s.channels.clutch)   drawLiveTrace(COLOR.clutch,   'clu');
 
-    if (s.ghosts.sessionBest) drawGhostFor(ghosts.sessionBest);
-    if (s.ghosts.allTimeBest) drawGhostFor(ghosts.allTimeBest);
+      const drawGhostFor = (trace: LapTrace | null) => {
+        if (!trace) return;
+        if (s.ghosts.throttle && s.channels.throttle) drawGhostChannel(trace, COLOR.throttleGhost, 'throttle');
+        if (s.ghosts.brake    && s.channels.brake)    drawGhostChannel(trace, COLOR.brakeGhost,    'brake');
+      };
+
+      if (s.ghosts.sessionBest) drawGhostFor(ghosts.sessionBest);
+      if (s.ghosts.allTimeBest) drawGhostFor(ghosts.allTimeBest);
+    }
+
+    // Canvas wheel: only when no photo is shown and the angle actually moved
+    if (!currentWheelImage && Math.abs(steeringAngle - lastDrawnAngle) > 0.002) {
+      lastDrawnAngle = steeringAngle;
+      drawWheel(steeringAngle);
+    }
   }
-
-  drawWheel(steeringAngle);
   requestAnimationFrame(render);
 }
 
 // ─── Telemetry handler ────────────────────────────────────────────────────────
-tvAPI.onTelemetry((sample: TelemetrySample) => {
-  const connected   = sample.connected ?? true;
-  steeringAngle = sample.steeringAngle;
+// Every DOM write below is guarded so unchanged values cost nothing — style and
+// text mutations are what trigger layout/paint work in the compositor.
+let lastConnected = false;
+let lastWheelDeg  = Infinity;
+let lastClutchBar = -1;
+let lastBrakeBar  = -1;
+let lastThrBar    = -1;
+let lastGearText  = '';
+let lastSpeedText = '';
 
-  // Rotate real wheel image via CSS (faster than canvas for an img element)
-  if (usingWheelImage) {
-    const deg = -(steeringAngle * 180 / Math.PI);
-    wheelImg.style.transform = `rotate(${deg}deg)`;
+function setBar(el: HTMLElement, value: number, last: number): number {
+  const v = Math.round(Math.max(0, Math.min(1, value)) * 200) / 200; // 0.5% steps
+  if (v !== last) el.style.transform = `scaleY(${v})`;
+  return v;
+}
+
+tvAPI.onTelemetry((sample: TelemetrySample) => {
+  const connected = sample.connected ?? true;
+  if (connected !== lastConnected) {
+    lastConnected = connected;
+    statusDot.className = connected ? 'connected' : 'disconnected';
   }
 
-  statusDot.className = connected ? 'connected' : 'disconnected';
+  // Disconnected packets carry no data — keep showing the last real values
+  if (!connected || sample.gear === undefined) return;
 
-  // Pedal bars — fill from bottom
-  barClutch.style.height   = (sample.clutch   * 100).toFixed(1) + '%';
-  barBrake.style.height    = (sample.brake    * 100).toFixed(1) + '%';
-  barThrottle.style.height = (sample.throttle * 100).toFixed(1) + '%';
+  steeringAngle = sample.steeringAngle;
+
+  // Rotate real wheel image via CSS (composited transform — no repaint)
+  if (currentWheelImage) {
+    const deg = Math.round(-(steeringAngle * 180 / Math.PI) * 10) / 10;
+    if (deg !== lastWheelDeg) {
+      lastWheelDeg = deg;
+      wheelImg.style.transform = `rotate(${deg}deg)`;
+    }
+  }
+
+  // Pedal bars — scaleY on a composited layer instead of height (no layout)
+  lastClutchBar = setBar(barClutch,   sample.clutch,   lastClutchBar);
+  lastBrakeBar  = setBar(barBrake,    sample.brake,    lastBrakeBar);
+  lastThrBar    = setBar(barThrottle, sample.throttle, lastThrBar);
 
   // Gear (iRacing: 0=neutral, -1=reverse, 1+=forward)
   const g = sample.gear;
-  vGearBig.textContent  = g === -1 ? 'R' : g === 0 ? 'N' : String(g);
-  vSpeedBig.textContent = Math.round(sample.speedMs * 2.23694).toString();
+  const gearText = g === -1 ? 'R' : g === 0 ? 'N' : String(g);
+  if (gearText !== lastGearText) { lastGearText = gearText; vGearBig.textContent = gearText; }
+  const speedText = Math.round(sample.speedMs * 2.23694).toString();
+  if (speedText !== lastSpeedText) { lastSpeedText = speedText; vSpeedBig.textContent = speedText; }
 
   ring.push({ pct: sample.lapDistPct, thr: sample.throttle, brk: sample.brake, clu: sample.clutch });
   if (ring.length > HISTORY) ring.shift();
+
+  markDirty(); // canvas redraws once per telemetry packet, not once per vsync
 });
 
 tvAPI.onSettings(applySettings);
-tvAPI.onGhosts((payload: GhostPayload) => { ghosts = payload; });
+tvAPI.onGhosts((payload: GhostPayload) => { ghosts = payload; markDirty(); });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 (async () => {

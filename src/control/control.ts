@@ -12,11 +12,12 @@ declare const tvAPI: {
   setChannels:    (c: Settings['channels']) => void;
   setStartup:     (v: boolean) => void;
   setAccent:      (c: string) => void;
+  setWheelImage:  (v: string) => void;
   toggleBranding: () => void;
   resetBest:      (p: { carKey?: string; trackKey?: string }) => void;
   quit:              () => void;
   startMove:         () => void;
-  onWheelDetected:   (cb: (id: string) => void) => void;
+  onWheelDetected:   (cb: (payload: { id: string; brand: string }) => void) => void;
 };
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ const ghThrottle   = document.getElementById('gh-throttle')   as HTMLInputElemen
 const ghBrake      = document.getElementById('gh-brake')      as HTMLInputElement;
 const colAccent    = document.getElementById('col-accent')    as HTMLInputElement;
 const togStartup   = document.getElementById('tog-startup')   as HTMLInputElement;
+const selWheelImg  = document.getElementById('sel-wheel-img') as HTMLSelectElement;
 const btnResetCur    = document.getElementById('btn-reset-cur')!;
 const btnResetAll    = document.getElementById('btn-reset-all')!;
 const btnQuit        = document.getElementById('btn-quit')!;
@@ -46,13 +48,29 @@ let currentSettings: Settings | null = null;
 let lastCarKey   = '';
 let lastTrackKey = '';
 
+// ─── Opacity curve ─────────────────────────────────────────────────────────────
+// The slider position maps to opacity through a square-root curve so the top of
+// the range fades gently — small drags near "fully opaque" barely change it, and
+// most of the transparency happens in the lower half of the slider.
+const OPACITY_MIN = 0.3;
+
+function sliderToOpacity(t: number): number {
+  return OPACITY_MIN + (1 - OPACITY_MIN) * Math.sqrt(Math.max(0, Math.min(1, t)));
+}
+
+function opacityToSlider(op: number): number {
+  const n = (op - OPACITY_MIN) / (1 - OPACITY_MIN);
+  const clamped = Math.max(0, Math.min(1, n));
+  return clamped * clamped;
+}
+
 // ─── Apply settings to UI ──────────────────────────────────────────────────────
 function applySettings(s: Settings): void {
   currentSettings = s;
   const on = s.overlayVisible;
   btnOverlayPower.classList.toggle('overlay-off', !on);
   togLocked.checked   = s.overlayLocked;
-  slOpacity.value     = String(s.overlayOpacity);
+  slOpacity.value     = String(opacityToSlider(s.overlayOpacity));
   chThrottle.checked  = s.channels.throttle;
   chBrake.checked     = s.channels.brake;
   chClutch.checked    = s.channels.clutch;
@@ -65,12 +83,13 @@ function applySettings(s: Settings): void {
   ghBrake.checked     = s.ghosts.brake;
   colAccent.value     = s.accentColor;
   togStartup.checked  = s.launchOnStartup;
+  selWheelImg.value   = (!s.wheelImage || s.wheelImage === 'auto') ? 'drawn' : s.wheelImage;
 }
 
 // ─── Event wiring ──────────────────────────────────────────────────────────────
 btnOverlayPower.addEventListener('click', () => tvAPI.toggleOverlay());
 togLocked.addEventListener('change',   () => tvAPI.toggleLock());
-slOpacity.addEventListener('input',    () => tvAPI.setOpacity(parseFloat(slOpacity.value)));
+slOpacity.addEventListener('input',    () => tvAPI.setOpacity(sliderToOpacity(parseFloat(slOpacity.value))));
 
 function syncChannels(): void {
   tvAPI.setChannels({
@@ -115,6 +134,7 @@ ghSession.addEventListener('change', () => {
 
 colAccent.addEventListener('input', () => tvAPI.setAccent(colAccent.value));
 togStartup.addEventListener('change', () => tvAPI.setStartup(togStartup.checked));
+selWheelImg.addEventListener('change', () => tvAPI.setWheelImage(selWheelImg.value));
 
 btnResetCur.addEventListener('click', () => {
   if (!confirm('Reset all-time best for the current car + track?')) return;
@@ -129,9 +149,35 @@ btnResetAll.addEventListener('click', () => {
 btnQuit.addEventListener('click', () => tvAPI.quit());
 btnMoveOverlay.addEventListener('click', () => tvAPI.startMove());
 
-tvAPI.onWheelDetected((id: string) => {
+// Which manual wheel-image options belong to which wheelbase brand.
+// When a base is detected, only its own brand's wheels are offered.
+const OPTION_BRANDS: Record<string, string> = {
+  'simagic-gt':     'simagic',
+  'simagic-fx-pro': 'simagic',
+  'simagic-gts':    'simagic',
+  'fanatec':        'fanatec',
+  'simucube':       'simucube',
+};
+
+function filterWheelOptions(brand: string): void {
+  let selectionHidden = false;
+  for (const opt of Array.from(selWheelImg.options)) {
+    const optBrand = OPTION_BRANDS[opt.value];
+    // 'drawn' has no brand and is always available
+    const hide = !!optBrand && !!brand && optBrand !== brand;
+    opt.hidden = hide;
+    if (hide && selWheelImg.value === opt.value) selectionHidden = true;
+  }
+  if (selectionHidden) {
+    selWheelImg.value = 'drawn';
+    tvAPI.setWheelImage('drawn');
+  }
+}
+
+tvAPI.onWheelDetected(({ id, brand }) => {
   const el = document.getElementById('detected-wheel')!;
   el.textContent = id;
+  filterWheelOptions(brand);
 });
 
 // ─── Live updates ──────────────────────────────────────────────────────────────

@@ -10,20 +10,22 @@
 <body>
 
   <div id="panel-header">
-    <h1>Track Vision Overlay</h1>
+    <div id="panel-branding">
+      <img id="panel-logo" src="../overlay/helmet.svg" alt="" />
+      <h1>Track Vision Overlay</h1>
+    </div>
     <span id="conn-badge">WAITING</span>
   </div>
 
-  <!-- Overlay toggle + Close App -->
+  <!-- Overlay toggle -->
   <div id="overlay-power-section">
     <button id="btn-overlay-power">
       <span id="overlay-power-dot"></span>
       <span id="overlay-power-label">TOGGLE OVERLAY</span>
     </button>
-    <button class="btn quit-btn" id="btn-quit">Close App</button>
   </div>
 
-  <!-- Lock + Opacity -->
+  <!-- Overlay settings -->
   <div class="section">
     <div class="section-title">Overlay</div>
 
@@ -37,12 +39,10 @@
 
     <div class="slider-row">
       <label for="sl-opacity">Opacity</label>
-      <input type="range" id="sl-opacity" min="0.3" max="1" step="0.01" value="0.85" />
+      <input type="range" id="sl-opacity" min="0" max="1" step="0.01" value="0.85" />
     </div>
 
-    <div class="btn-row" style="margin-top: 10px;">
-      <button class="btn" id="btn-move-overlay">Move Overlay</button>
-    </div>
+    <button class="btn" id="btn-move-overlay">Move Overlay</button>
   </div>
 
   <!-- Channels -->
@@ -67,8 +67,8 @@
       <label class="checkbox-item"><input type="checkbox" id="gh-throttle" /> Show throttle</label>
       <label class="checkbox-item"><input type="checkbox" id="gh-brake" />    Show brake</label>
     </div>
-    <div class="btn-row" style="margin-top: 12px;">
-      <button class="btn danger" id="btn-reset-cur">Reset current car/track</button>
+    <div class="btn-row">
+      <button class="btn danger" id="btn-reset-cur">Reset current</button>
       <button class="btn danger" id="btn-reset-all">Reset all</button>
     </div>
   </div>
@@ -78,7 +78,7 @@
     <div class="section-title">Theme</div>
     <div class="color-row">
       <label for="col-accent">Accent color</label>
-      <input type="color" id="col-accent" value="#00FF87" />
+      <input type="color" id="col-accent" value="#39FF14" />
     </div>
   </div>
 
@@ -96,10 +96,23 @@
       <span class="toggle-label">Detected wheel</span>
       <span id="detected-wheel">—</span>
     </div>
+    <div class="select-row">
+      <label for="sel-wheel-img">Wheel image</label>
+      <select id="sel-wheel-img">
+        <option value="simagic-gt">Simagic GT</option>
+        <option value="simagic-fx-pro">Simagic FX Pro</option>
+        <option value="simagic-gts">Simagic GTS Leather</option>
+        <option value="fanatec">Fanatec</option>
+        <option value="simucube">Simucube</option>
+        <option value="drawn">Drawn wheel</option>
+      </select>
+    </div>
+    <button class="btn quit-btn" id="btn-quit">Close App</button>
   </div>
 
   <div id="panel-footer">
-    <small>Track Vision Sim Racing © 2026</small>
+    <small>trackvisionsimracing.com</small>
+    <small>© 2026</small>
   </div>
 
   <script src="control.js"></script>

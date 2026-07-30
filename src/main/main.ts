@@ -13,6 +13,8 @@ let overlayWin: BrowserWindow | null = null;
 let controlWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const positionHistory: { x: number; y: number; width: number; height: number }[] = [];
+let inDragMode     = false;
+let suppressMoved  = false; // ignore 'moved' fired by programmatic setBounds
 
 const DIST = path.join(__dirname, '..');
 function getAssetsPath(): string {
@@ -50,6 +52,17 @@ function createOverlayWindow(): void {
 
   overlayWin.on('closed', () => { overlayWin = null; });
 
+  // Every completed drag: remember where it was (for Reset) and save the new spot
+  overlayWin.on('moved', () => {
+    if (!overlayWin || suppressMoved) return;
+    const prev = getSettings().overlayBounds;
+    const b    = overlayWin.getBounds();
+    if (b.x === prev.x && b.y === prev.y) return;
+    positionHistory.push({ ...prev });
+    setSetting('overlayBounds', b);
+    if (inDragMode) saveOverlayPosition(); // control-panel move: one drag, then done
+  });
+
   registerTelemetryWindow(overlayWin);
 }
 
@@ -63,7 +76,7 @@ function createControlWindow(): void {
 
   controlWin = new BrowserWindow({
     width: 420,
-    height: 680,
+    height: 760,
     title: 'Track Vision Overlay — Control Panel',
     resizable: false,
     icon: path.join(getAssetsPath(), 'tv-icon3.ico'),
@@ -154,7 +167,7 @@ function toggleLock(): void {
 
 function startMoveOverlay(): void {
   if (!overlayWin) return;
-  positionHistory.push(overlayWin.getBounds());
+  inDragMode = true; // history push happens in the 'moved' handler
   overlayWin.setFocusable(true);
   overlayWin.setIgnoreMouseEvents(false);
   overlayWin.webContents.send(IPC.DRAG_MODE, true);
@@ -162,6 +175,7 @@ function startMoveOverlay(): void {
 
 function saveOverlayPosition(): void {
   if (!overlayWin) return;
+  inDragMode = false;
   setSetting('overlayBounds', overlayWin.getBounds());
   overlayWin.setFocusable(false);
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
@@ -171,7 +185,10 @@ function saveOverlayPosition(): void {
 function resetOverlayPosition(): void {
   if (!overlayWin || positionHistory.length === 0) return;
   const prev = positionHistory.pop()!;
+  inDragMode    = false;
+  suppressMoved = true;
   overlayWin.setBounds(prev);
+  setTimeout(() => { suppressMoved = false; }, 100);
   setSetting('overlayBounds', prev);
   overlayWin.setFocusable(false);
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
@@ -221,6 +238,11 @@ function registerIpc(): void {
     broadcastSettings();
   });
 
+  ipcMain.on(IPC.SET_WHEEL_IMAGE, (_, choice: string) => {
+    setSetting('wheelImage', choice);
+    broadcastSettings();
+  });
+
   ipcMain.on(IPC.TOGGLE_BRANDING, () => {
     setSetting('showBranding', !getSettings().showBranding);
     broadcastSettings();
@@ -236,8 +258,8 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.GET_SETTINGS, () => getSettings());
 
-  ipcMain.on(IPC.WHEEL_DETECTED, (_, id: string) => {
-    if (controlWin && !controlWin.isDestroyed()) controlWin.webContents.send(IPC.WHEEL_DETECTED, id);
+  ipcMain.on(IPC.WHEEL_DETECTED, (_, payload: { id: string; brand: string }) => {
+    if (controlWin && !controlWin.isDestroyed()) controlWin.webContents.send(IPC.WHEEL_DETECTED, payload);
   });
 
   ipcMain.on(IPC.START_MOVE,     () => startMoveOverlay());

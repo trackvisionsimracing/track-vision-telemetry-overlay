@@ -73,6 +73,7 @@ export interface Settings {
   invertClutch: boolean;        // true = display (1 - clutch)
   accentColor: string;          // hex, default '#00FF87'
   showBranding: boolean;
+  wheelImage: string;           // 'drawn' | wheel key e.g. 'simagic-gt'
   channels: ChannelToggles;
   ghosts: GhostToggles;
   debugWaiting: boolean;        // show "waiting for iRacing" overlay when disconnected
@@ -95,6 +96,7 @@ export const IPC = {
   SET_CHANNELS:     'channels:set',
   SET_STARTUP:      'startup:set',
   SET_ACCENT:       'accent:set',
+  SET_WHEEL_IMAGE:  'wheel-image:set',
   TOGGLE_BRANDING:  'branding:toggle',
   RESET_BEST:       'lap:reset-best',
   GET_SETTINGS:     'settings:get',

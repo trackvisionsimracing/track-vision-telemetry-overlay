@@ -157,12 +157,6 @@ html, body {
   color: #fff;
 }
 
-#btn-move-pos.active {
-  background: rgba(var(--tv-accent-rgb, 57,255,20), 0.18);
-  border-color: var(--tv-accent);
-  color: var(--tv-accent);
-}
-
 /* ─── Status dot ─────────────────────────────────────────────────────────── */
 #status-dot {
   width: 6px;
@@ -235,12 +229,13 @@ html, body {
 
 .pedal-fill {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 0%;
+  inset: 0;
   border-radius: 2px;
-  transition: height 0.04s linear;
+  /* Animated via scaleY on a composited layer — cheaper than height (no layout) */
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.04s linear;
+  will-change: transform;
 }
 
 .pedal-clutch   { background: var(--tv-blue); }
@@ -328,6 +323,7 @@ html, body {
   border-radius: 10px;
   display: block;
   transition: transform 0.03s linear;
+  will-change: transform;
 }
 
 #wheel-img.hidden { display: none; }

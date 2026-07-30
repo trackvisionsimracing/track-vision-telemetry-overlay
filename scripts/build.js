@@ -28,6 +28,7 @@ esbuild.buildSync({
     'irsdk-node',            // pure-JS wrapper — must NOT be bundled (loads native via require)
     '@irsdk-node/native',    // native .node binary — must NOT be bundled
     'node-gyp-build',        // runtime loader for prebuilt binaries
+    'koffi',                 // native FFI library (AC shared memory) — must NOT be bundled
   ],
 });
 

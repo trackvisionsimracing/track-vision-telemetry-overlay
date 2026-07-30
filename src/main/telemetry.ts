@@ -2,6 +2,8 @@ import { BrowserWindow } from 'electron';
 import { IPC, TelemetrySample, SessionInfo, LapTrace } from '../shared/types';
 import { getSettings } from './settings';
 import { resampleIntoBins, maybeUpdateAllTimeBest, getAllTimeBest } from './lapStore';
+import { acRead, acStop } from './acShared';
+import { f1Start, f1Read, f1Stop } from './f1Udp';
 
 // irsdk-node v4 — has N-API prebuilt binaries for win32-x64
 let IRacingSDK: any = null;
@@ -45,28 +47,30 @@ export function registerTelemetryWindow(win: BrowserWindow): void {
 function broadcast(channel: string, data: unknown): void {
   windows = windows.filter(w => !w.isDestroyed());
   for (const win of windows) {
+    // Skip the 60 Hz telemetry stream for hidden windows — state updates
+    // (settings/ghosts/session) still go through so they're fresh on re-show
+    if (channel === IPC.TELEMETRY_UPDATE && !win.isVisible()) continue;
     try { win.webContents.send(channel, data); } catch { /* closing */ }
   }
 }
 
-// ─── Stub (no iRacing / no SDK) ───────────────────────────────────────────────
-
-function stubSample(): TelemetrySample {
-  const t = Date.now() / 1000;
-  return {
-    throttle: Math.max(0, Math.sin(t * 0.7) * 0.5 + 0.5),
-    brake:    Math.max(0, Math.sin(t * 0.4 + 1) * 0.3),
-    clutch:   0,
-    steeringAngle: Math.sin(t * 0.3) * 0.4,
-    gear: 3, speedMs: 40, rpm: 6500,
-    lap: 1, lapDistPct: (t % 90) / 90,
-    lapCurrentTime: t % 90, lapLastTime: 0, lapBestTime: 0,
-    onPitRoad: false, isOnTrack: true, sessionFlags: 0,
-    connected: false,
-  };
-}
-
 // ─── Session info ─────────────────────────────────────────────────────────────
+
+function applySessionInfo(si: SessionInfo): void {
+  if (
+    si.carName     === sessionInfo.carName &&
+    si.trackName   === sessionInfo.trackName &&
+    si.trackConfig === sessionInfo.trackConfig
+  ) return;
+
+  sessionInfo = si;
+  broadcast(IPC.SESSION_INFO, sessionInfo);
+
+  // Load stored all-time best for new car+track
+  const stored = getAllTimeBest(si.carName, `${si.trackName}||${si.trackConfig}`);
+  allTimeBest  = stored;
+  broadcast(IPC.GHOST_UPDATE, { sessionBest, allTimeBest });
+}
 
 let lastSessionVer = -1;
 
@@ -86,19 +90,7 @@ function maybeUpdateSessionInfo(): void {
     const trackName = weekend?.TrackDisplayName ?? 'unknown';
     const trackCfg  = weekend?.TrackConfigName  ?? '';
 
-    if (
-      carName   !== sessionInfo.carName ||
-      trackName !== sessionInfo.trackName ||
-      trackCfg  !== sessionInfo.trackConfig
-    ) {
-      sessionInfo = { carName, trackName, trackConfig: trackCfg };
-      broadcast(IPC.SESSION_INFO, sessionInfo);
-
-      // Load stored all-time best for new car+track
-      const stored = getAllTimeBest(carName, `${trackName}||${trackCfg}`);
-      allTimeBest  = stored;
-      broadcast(IPC.GHOST_UPDATE, { sessionBest, allTimeBest });
-    }
+    applySessionInfo({ carName, trackName, trackConfig: trackCfg });
   } catch (e) {
     console.error('[telemetry] session info error', e);
   }
@@ -150,38 +142,29 @@ function handleLapCompletion(lapTime: number): void {
 
 // ─── Telemetry tick ───────────────────────────────────────────────────────────
 
-function tick(): void {
-  if (!sdk) return;
+function irTick(): TelemetrySample | null {
+  if (!sdk) return null;
 
   // waitForData(0) = non-blocking check for new data
   const hasData = sdk.waitForData(0);
-  if (!hasData) return;
+  if (!hasData) return null;
 
-  const alive = sdk.sessionStatusOK;
-
-  if (!alive) {
-    broadcast(IPC.TELEMETRY_UPDATE, { connected: false } as Partial<TelemetrySample>);
+  if (!sdk.sessionStatusOK) {
     // Try to reconnect automatically
     try { sdk.startSDK(); } catch { /* ignore */ }
-    return;
+    return null;
   }
 
   maybeUpdateSessionInfo();
 
   const telem = sdk.getTelemetry();
-  if (!telem) return;
+  if (!telem) return null;
 
   const settings = getSettings();
   const rawClutch: number = telem.Clutch?.value?.[0] ?? 0;
   const clutch = settings.invertClutch ? 1 - rawClutch : rawClutch;
 
-  const lap: number     = telem.Lap?.value?.[0] ?? 0;
-  const onPit: boolean  = telem.OnPitRoad?.value?.[0] ?? false;
-  const isOnTrack: boolean = telem.IsOnTrack?.value?.[0] ?? false;
-  const lapDistPct: number = telem.LapDistPct?.value?.[0] ?? 0;
-  const lapLastTime: number = telem.LapLastLapTime?.value?.[0] ?? 0;
-
-  const sample: TelemetrySample = {
+  return {
     throttle:      telem.Throttle?.value?.[0] ?? 0,
     brake:         telem.Brake?.value?.[0]    ?? 0,
     clutch,
@@ -189,29 +172,77 @@ function tick(): void {
     gear:          telem.Gear?.value?.[0]     ?? 0,
     speedMs:       telem.Speed?.value?.[0]    ?? 0,
     rpm:           telem.RPM?.value?.[0]      ?? 0,
-    lap,
-    lapDistPct,
+    lap:           telem.Lap?.value?.[0]      ?? 0,
+    lapDistPct:    telem.LapDistPct?.value?.[0] ?? 0,
     lapCurrentTime: telem.LapCurrentLapTime?.value?.[0] ?? 0,
-    lapLastTime,
+    lapLastTime:   telem.LapLastLapTime?.value?.[0]    ?? 0,
     lapBestTime:   telem.LapBestLapTime?.value?.[0]    ?? 0,
-    onPitRoad:  onPit,
-    isOnTrack,
+    onPitRoad:     telem.OnPitRoad?.value?.[0] ?? false,
+    isOnTrack:     telem.IsOnTrack?.value?.[0] ?? false,
     sessionFlags:  telem.SessionFlags?.value?.[0] ?? 0,
     connected: true,
   };
+}
 
-  if (isOnTrack) {
-    currentLapSamples.push({ lapDistPct, throttle: sample.throttle, brake: sample.brake, clutch });
-    if (onPit) hadPitRoad = true;
+function acTick(): TelemetrySample | null {
+  const ac = acRead();
+  if (!ac) return null;
+
+  applySessionInfo(ac.session);
+
+  const settings = getSettings();
+  if (settings.invertClutch) ac.sample.clutch = 1 - ac.sample.clutch;
+  return ac.sample;
+}
+
+function f1Tick(): TelemetrySample | null {
+  const f1 = f1Read();
+  if (!f1) return null;
+
+  applySessionInfo(f1.session);
+  return f1.sample; // F1 clutch is already "amount pressed" — no inversion
+}
+
+function processSample(sample: TelemetrySample): void {
+  if (sample.isOnTrack) {
+    currentLapSamples.push({
+      lapDistPct: sample.lapDistPct,
+      throttle:   sample.throttle,
+      brake:      sample.brake,
+      clutch:     sample.clutch,
+    });
+    if (sample.onPitRoad) hadPitRoad = true;
   }
 
-  if (prevLap >= 0 && lap > prevLap) {
-    handleLapCompletion(lapLastTime);
+  if (prevLap >= 0 && sample.lap > prevLap) {
+    handleLapCompletion(sample.lapLastTime);
     hadPitRoad = false;
   }
-  prevLap = lap;
+  prevLap = sample.lap;
 
   broadcast(IPC.TELEMETRY_UPDATE, sample);
+}
+
+let lastSampleTime         = 0;
+let lastDisconnectBroadcast = 0;
+
+function tick(): void {
+  // iRacing first; if it has nothing this tick, try AC / ACC / AC EVO, then F1
+  const sample = irTick() ?? acTick() ?? f1Tick();
+  const now = Date.now();
+
+  if (sample) {
+    lastSampleTime = now;
+    processSample(sample);
+    return;
+  }
+
+  // Only report disconnected after a real gap — iRacing legitimately has no
+  // new frame on some 60 Hz ticks, and that must not flicker the status dot.
+  if (now - lastSampleTime > 2000 && now - lastDisconnectBroadcast > 1000) {
+    lastDisconnectBroadcast = now;
+    broadcast(IPC.TELEMETRY_UPDATE, { connected: false } as Partial<TelemetrySample>);
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -228,23 +259,22 @@ export function getGhosts() {
 export function startTelemetry(): void {
   if (pollInterval) return;
 
-  if (!IRacingSDK) {
-    console.log('[telemetry] stub mode');
-    pollInterval = setInterval(() => broadcast(IPC.TELEMETRY_UPDATE, stubSample()), POLL_MS);
-    return;
+  if (IRacingSDK) {
+    try {
+      sdk = new IRacingSDK({ autoEnableTelemetry: false });
+      const started = sdk.startSDK();
+      console.log(`[telemetry] startSDK → ${started}`);
+    } catch (e) {
+      console.error('[telemetry] iRacing SDK init failed', e);
+      sdk = null;
+    }
+  } else {
+    console.log('[telemetry] iRacing SDK unavailable — AC shared memory only');
   }
 
-  try {
-    sdk = new IRacingSDK({ autoEnableTelemetry: false });
-    const started = sdk.startSDK();
-    console.log(`[telemetry] startSDK → ${started}`);
-  } catch (e) {
-    console.error('[telemetry] SDK init failed, falling back to stub', e);
-    sdk = null;
-    pollInterval = setInterval(() => broadcast(IPC.TELEMETRY_UPDATE, stubSample()), POLL_MS);
-    return;
-  }
+  f1Start(); // UDP listener for F1 25 (and F1 22–24)
 
+  // The loop always runs: iRacing first, then AC / ACC / AC EVO, then F1
   pollInterval = setInterval(tick, POLL_MS);
   console.log('[telemetry] poll loop started at', POLL_HZ, 'Hz');
 }
@@ -253,5 +283,7 @@ export function stopTelemetry(): void {
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
   try { sdk?.stopSDK(); } catch { /* ignore */ }
   sdk = null;
+  acStop();
+  f1Stop();
   console.log('[telemetry] stopped');
 }
