@@ -424,6 +424,13 @@ let lastThrBar    = -1;
 let lastGearText  = '';
 let lastSpeedText = '';
 
+// Light smoothing for the trace line only — pedal bars stay raw/instant so
+// they still feel responsive. Exponential moving average: lower factor =
+// smoother but slower to react; high enough here to still show sharp braking.
+const TRACE_SMOOTH = 0.45;
+let emaThr = 0, emaBrk = 0, emaClu = 0;
+let emaInit = false;
+
 function setBar(el: HTMLElement, value: number, last: number): number {
   const v = Math.round(Math.max(0, Math.min(1, value)) * 200) / 200; // 0.5% steps
   if (v !== last) el.style.transform = `scaleY(${v})`;
@@ -435,6 +442,7 @@ tvAPI.onTelemetry((sample: TelemetrySample) => {
   if (connected !== lastConnected) {
     lastConnected = connected;
     statusDot.className = connected ? 'connected' : 'disconnected';
+    if (connected) emaInit = false; // don't drag the trace from stale pre-disconnect values
   }
 
   // Disconnected packets carry no data — keep showing the last real values
@@ -463,7 +471,16 @@ tvAPI.onTelemetry((sample: TelemetrySample) => {
   const speedText = Math.round(sample.speedMs * 2.23694).toString();
   if (speedText !== lastSpeedText) { lastSpeedText = speedText; vSpeedBig.textContent = speedText; }
 
-  ring.push({ pct: sample.lapDistPct, thr: sample.throttle, brk: sample.brake, clu: sample.clutch });
+  if (!emaInit) {
+    emaThr = sample.throttle; emaBrk = sample.brake; emaClu = sample.clutch;
+    emaInit = true;
+  } else {
+    emaThr += (sample.throttle - emaThr) * TRACE_SMOOTH;
+    emaBrk += (sample.brake    - emaBrk) * TRACE_SMOOTH;
+    emaClu += (sample.clutch   - emaClu) * TRACE_SMOOTH;
+  }
+
+  ring.push({ pct: sample.lapDistPct, thr: emaThr, brk: emaBrk, clu: emaClu });
   if (ring.length > HISTORY) ring.shift();
 
   markDirty(); // canvas redraws once per telemetry packet, not once per vsync
