@@ -1,13 +1,16 @@
 import dgram from 'dgram';
 import { TelemetrySample, SessionInfo } from '../shared/types';
 
-// ─── F1 25 (EA/Codemasters) UDP telemetry listener ────────────────────────────
-// The F1 games broadcast telemetry over UDP (default port 20777) when enabled
-// in game Settings → Telemetry. Packet layout: little-endian, no padding,
-// 29-byte header, 22 car slots; the header carries the player's car index.
-// The fields read here share the same offsets in F1 22 through F1 25.
+// ─── F1 (EA/Codemasters) UDP telemetry listener ───────────────────────────────
+// The F1 games broadcast telemetry over UDP when enabled in the game's
+// Settings → Telemetry. 20777 is the default, but motion software, dashboards,
+// and other tools commonly occupy it first — in which case the game gets
+// pointed at the next port up. So we open every port in the range below and
+// lock onto whichever one real F1 packets actually arrive on.
+// Packet layout: little-endian, no padding, 29-byte header, 22 car slots;
+// the header carries the player's car index.
 
-const PORT       = 20777;
+const PORTS      = [20777, 20778, 20779, 20780, 20781, 20782];
 const HEADER     = 29;
 const NUM_CARS   = 22;
 const STALE_MS   = 2000;
@@ -38,7 +41,7 @@ interface F1Lap {
   currentLapNum: number; pitStatus: number; driverStatus: number;
 }
 
-let socket: dgram.Socket | null = null;
+let sockets: dgram.Socket[] = [];
 let telem: F1Telemetry | null = null;
 let lapData: F1Lap | null = null;
 let trackId     = -1;
@@ -46,16 +49,24 @@ let trackLength = 0;
 let gameYear    = 0;
 let lastPacket  = 0;
 let announced   = false;
+let activePort  = 0; // the port F1 packets are actually arriving on
 
-function onPacket(buf: Buffer): void {
+function onPacket(buf: Buffer, port: number): void {
   if (buf.length < HEADER) return;
 
+  // Only real F1 packets pass this check, so unrelated traffic sharing these
+  // ports (motion software, dashboards) is ignored rather than misread.
   const packetFormat = buf.readUInt16LE(0);
-  if (packetFormat < 2022 || packetFormat > 2100) return; // not a supported F1 game
+  if (packetFormat < 2022 || packetFormat > 2100) return;
 
   const packetId  = buf.readUInt8(6);
   const playerIdx = buf.readUInt8(27);
   if (playerIdx >= NUM_CARS) return;
+
+  if (port !== activePort) {
+    activePort = port;
+    console.log(`[f1] detected F1 telemetry on port ${port}`);
+  }
 
   // Per-car struct size derived from the packet length so minor spec
   // changes between game versions don't break the player-slot lookup
@@ -97,15 +108,37 @@ function onPacket(buf: Buffer): void {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function f1Start(): void {
-  if (socket) return;
-  try {
-    socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    socket.on('message', onPacket);
-    socket.on('error', (e) => console.warn('[f1] socket error:', e.message));
-    socket.bind(PORT, () => console.log(`[f1] listening for F1 UDP telemetry on port ${PORT}`));
-  } catch (e) {
-    console.warn('[f1] failed to start UDP listener', e);
-    socket = null;
+  if (sockets.length) return;
+
+  const opened: number[] = [];
+
+  for (const port of PORTS) {
+    try {
+      // reuseAddr lets us share a port that another tool already holds, so a
+      // motion system on 20777 doesn't stop us from seeing the game's data.
+      const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+      sock.on('message', (buf) => onPacket(buf, port));
+
+      // A port being unavailable is normal — just skip it and keep the rest
+      sock.on('error', (e: NodeJS.ErrnoException) => {
+        console.warn(`[f1] port ${port} unavailable (${e.code || e.message})`);
+        try { sock.close(); } catch { /* already closing */ }
+        sockets = sockets.filter(s => s !== sock);
+      });
+
+      sock.bind(port);
+      sockets.push(sock);
+      opened.push(port);
+    } catch (e) {
+      console.warn(`[f1] could not open port ${port}`, e);
+    }
+  }
+
+  if (opened.length) {
+    console.log(`[f1] listening for F1 UDP telemetry on ports ${opened.join(', ')}`);
+  } else {
+    console.warn('[f1] no UDP ports could be opened — F1 telemetry unavailable');
   }
 }
 
@@ -115,12 +148,13 @@ export function f1Read(): { sample: TelemetrySample; session: SessionInfo } | nu
     if (announced) { announced = false; console.log('[f1] telemetry stopped'); }
     telem   = null;
     lapData = null;
+    activePort = 0; // re-detect the port if the game comes back on a different one
     return null;
   }
 
   if (!announced) {
     announced = true;
-    console.log(`[f1] live data (F1 ${gameYear || '2x'})`);
+    console.log(`[f1] live data (F1 ${gameYear || '2x'}) on port ${activePort}`);
   }
 
   const pct = trackLength > 0
@@ -157,8 +191,11 @@ export function f1Read(): { sample: TelemetrySample; session: SessionInfo } | nu
 }
 
 export function f1Stop(): void {
-  try { socket?.close(); } catch { /* ignore */ }
-  socket  = null;
+  for (const sock of sockets) {
+    try { sock.close(); } catch { /* ignore */ }
+  }
+  sockets = [];
   telem   = null;
   lapData = null;
+  activePort = 0;
 }
