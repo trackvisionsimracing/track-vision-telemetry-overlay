@@ -100,6 +100,7 @@ export const IPC = {
   TOGGLE_BRANDING:  'branding:toggle',
   RESET_BEST:       'lap:reset-best',
   GET_SETTINGS:     'settings:get',
+  GET_F1_PORTS:     'f1:get-ports',
 
   // Overlay interactive region hover
   OVERLAY_HOVER_IN:  'overlay:hover-in',

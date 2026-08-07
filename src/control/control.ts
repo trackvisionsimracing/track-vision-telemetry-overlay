@@ -2,6 +2,7 @@ import type { Settings, TelemetrySample, GhostPayload } from '../shared/types';
 
 declare const tvAPI: {
   getSettings:    () => Promise<Settings>;
+  getF1Ports:     () => Promise<number[]>;
   onSettings:     (cb: (d: Settings) => void)         => void;
   onGhosts:       (cb: (d: GhostPayload) => void)     => void;
   onTelemetry:    (cb: (d: TelemetrySample) => void)  => void;
@@ -194,4 +195,13 @@ tvAPI.onTelemetry((sample: TelemetrySample) => {
   const s = await tvAPI.getSettings();
   applySettings(s);
   updateGhostChannelRows();
+
+  // Show the UDP port the app is listening on, read live from the main process
+  try {
+    const ports = await tvAPI.getF1Ports();
+    const el = document.getElementById('f1-port');
+    if (el) el.textContent = ports?.length ? ports.join(', ') : 'unavailable';
+  } catch {
+    /* leave the placeholder */
+  }
 })();

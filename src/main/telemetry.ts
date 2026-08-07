@@ -3,7 +3,9 @@ import { IPC, TelemetrySample, SessionInfo, LapTrace } from '../shared/types';
 import { getSettings } from './settings';
 import { resampleIntoBins, maybeUpdateAllTimeBest, getAllTimeBest } from './lapStore';
 import { acRead, acStop } from './acShared';
-import { f1Start, f1Read, f1Stop } from './f1Udp';
+import { f1Start, f1Read, f1Stop, getF1Ports } from './f1Udp';
+
+export { getF1Ports };
 
 // irsdk-node v4 — has N-API prebuilt binaries for win32-x64
 let IRacingSDK: any = null;

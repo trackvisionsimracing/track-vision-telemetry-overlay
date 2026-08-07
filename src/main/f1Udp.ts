@@ -190,6 +190,12 @@ export function f1Read(): { sample: TelemetrySample; session: SessionInfo } | nu
   return { sample, session };
 }
 
+// Ports we actually managed to open — shown in the control panel so the
+// configured port is visible without digging through logs.
+export function getF1Ports(): number[] {
+  return PORTS.slice();
+}
+
 export function f1Stop(): void {
   for (const sock of sockets) {
     try { sock.close(); } catch { /* ignore */ }

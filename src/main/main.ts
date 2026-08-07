@@ -5,7 +5,7 @@ import path from 'path';
 import { IPC, Settings, GhostToggles, ChannelToggles } from '../shared/types';
 import { getSettings, setSetting } from './settings';
 import {
-  startTelemetry, stopTelemetry, registerTelemetryWindow, getGhosts, resetSessionBest
+  startTelemetry, stopTelemetry, registerTelemetryWindow, getGhosts, resetSessionBest, getF1Ports
 } from './telemetry';
 import { resetAllTimeBest, getAllTimeBest } from './lapStore';
 
@@ -292,6 +292,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.GET_SETTINGS, () => getSettings());
+  ipcMain.handle(IPC.GET_F1_PORTS, () => getF1Ports());
 
   ipcMain.on(IPC.WHEEL_DETECTED, (_, payload: { id: string; brand: string }) => {
     if (controlWin && !controlWin.isDestroyed()) controlWin.webContents.send(IPC.WHEEL_DETECTED, payload);

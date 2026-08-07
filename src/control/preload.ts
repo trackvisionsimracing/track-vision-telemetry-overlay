@@ -3,6 +3,7 @@ import { IPC } from '../shared/types';
 
 contextBridge.exposeInMainWorld('tvAPI', {
   getSettings:   ()             => ipcRenderer.invoke(IPC.GET_SETTINGS),
+  getF1Ports:    ()             => ipcRenderer.invoke(IPC.GET_F1_PORTS),
   onSettings:    (cb: (d: any) => void) => ipcRenderer.on(IPC.SETTINGS_UPDATE, (_, d) => cb(d)),
   onGhosts:      (cb: (d: any) => void) => ipcRenderer.on(IPC.GHOST_UPDATE,    (_, d) => cb(d)),
   onTelemetry:   (cb: (d: any) => void) => ipcRenderer.on(IPC.TELEMETRY_UPDATE,(_, d) => cb(d)),
