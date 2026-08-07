@@ -1,6 +1,6 @@
 {
   "name": "track-vision-overlay",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Track Vision Sim Racing — iRacing, Assetto Corsa / EVO, and F1 telemetry overlay",
   "main": "dist/main/main.js",
   "scripts": {

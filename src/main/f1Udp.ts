@@ -3,14 +3,13 @@ import { TelemetrySample, SessionInfo } from '../shared/types';
 
 // ─── F1 (EA/Codemasters) UDP telemetry listener ───────────────────────────────
 // The F1 games broadcast telemetry over UDP when enabled in the game's
-// Settings → Telemetry. 20777 is the default, but motion software, dashboards,
-// and other tools commonly occupy it first — in which case the game gets
-// pointed at the next port up. So we open every port in the range below and
-// lock onto whichever one real F1 packets actually arrive on.
+// Settings → Telemetry. We deliberately listen ONLY on 20779, leaving the
+// default 20777 free for motion software / dashboards so we can't interfere
+// with their data stream. The game must be set to send on this same port.
 // Packet layout: little-endian, no padding, 29-byte header, 22 car slots;
 // the header carries the player's car index.
 
-const PORTS      = [20777, 20778, 20779, 20780, 20781, 20782];
+const PORTS      = [20779];
 const HEADER     = 29;
 const NUM_CARS   = 22;
 const STALE_MS   = 2000;
@@ -136,7 +135,8 @@ export function f1Start(): void {
   }
 
   if (opened.length) {
-    console.log(`[f1] listening for F1 UDP telemetry on ports ${opened.join(', ')}`);
+    const label = opened.length === 1 ? 'port' : 'ports';
+    console.log(`[f1] listening for F1 UDP telemetry on ${label} ${opened.join(', ')}`);
   } else {
     console.warn('[f1] no UDP ports could be opened — F1 telemetry unavailable');
   }
