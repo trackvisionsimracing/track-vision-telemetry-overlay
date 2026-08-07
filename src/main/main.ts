@@ -15,10 +15,37 @@ let tray: Tray | null = null;
 const positionHistory: { x: number; y: number; width: number; height: number }[] = [];
 let inDragMode     = false;
 let suppressMoved  = false; // ignore 'moved' fired by programmatic setBounds
+let topmostTimer: ReturnType<typeof setInterval> | null = null;
 
 const DIST = path.join(__dirname, '..');
 function getAssetsPath(): string {
   return path.join(app.isPackaged ? process.resourcesPath : path.join(__dirname, '../../'), 'assets');
+}
+
+// ─── Keep the overlay above the game ──────────────────────────────────────────
+// Windows silently demotes topmost windows when a game (especially windowed or
+// borderless) takes the foreground, so setting alwaysOnTop once at startup
+// isn't enough — it has to be re-asserted for the overlay to stay visible.
+
+function assertOnTop(): void {
+  if (!overlayWin || overlayWin.isDestroyed() || !overlayWin.isVisible()) return;
+  // 'screen-saver' is the highest level Electron exposes
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.moveTop(); // raise in the z-order without stealing focus from the game
+}
+
+function startTopmostKeeper(): void {
+  if (topmostTimer) return;
+  assertOnTop();
+  // 500ms keeps recovery quick when alt-tabbing back into the game; the
+  // underlying SetWindowPos call is cheap enough to be free at this rate.
+  topmostTimer = setInterval(assertOnTop, 500);
+}
+
+function stopTopmostKeeper(): void {
+  if (!topmostTimer) return;
+  clearInterval(topmostTimer);
+  topmostTimer = null;
 }
 
 // ─── Overlay window ───────────────────────────────────────────────────────────
@@ -45,12 +72,18 @@ function createOverlayWindow(): void {
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.setOpacity(s.overlayOpacity);
+  // Keep it present when the game is on another virtual desktop / fullscreen space
+  overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   overlayWin.loadFile(path.join(DIST, 'overlay/overlay.html'));
 
   if (!s.overlayVisible) overlayWin.hide();
 
-  overlayWin.on('closed', () => { overlayWin = null; });
+  overlayWin.on('closed', () => { stopTopmostKeeper(); overlayWin = null; });
+  overlayWin.on('show', () => startTopmostKeeper());
+  overlayWin.on('hide', () => stopTopmostKeeper());
+
+  if (s.overlayVisible) startTopmostKeeper();
 
   // Every completed drag: remember where it was (for Reset) and save the new spot
   overlayWin.on('moved', () => {
@@ -180,6 +213,7 @@ function saveOverlayPosition(): void {
   overlayWin.setFocusable(false);
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.webContents.send(IPC.DRAG_MODE, false);
+  assertOnTop(); // toggling focusable can drop the topmost flag on Windows
 }
 
 function resetOverlayPosition(): void {
@@ -193,6 +227,7 @@ function resetOverlayPosition(): void {
   overlayWin.setFocusable(false);
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.webContents.send(IPC.DRAG_MODE, false);
+  assertOnTop(); // toggling focusable can drop the topmost flag on Windows
 }
 
 function setStartup(enabled: boolean): void {
@@ -297,5 +332,6 @@ app.on('window-all-closed', (e: Event) => {
 });
 
 app.on('before-quit', () => {
+  stopTopmostKeeper();
   stopTelemetry();
 });
